@@ -55,6 +55,10 @@ export const SCOPE_VERIFIER_REQUIREMENTS = {
 
 export type Scope = keyof typeof SCOPE_VERIFIER_REQUIREMENTS
 
+export const SCOPES = ['street', 'neighborhood', 'city', 'national', 'global'] as const
+
+export type ScopeValue = (typeof SCOPES)[number]
+
 // Content classification types
 export const CONTENT_TYPES = [
   'fact_claim',

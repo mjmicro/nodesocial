@@ -2,54 +2,31 @@ import { useState } from 'react'
 import { Alert, Pressable, Text, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { supabase } from '~/utils/supabase'
-import { API_URL } from '@truthlayer/api-client'
+import { useRegister } from '@truthlayer/api-client'
 import { RegisterSchema } from '@truthlayer/shared'
+import { useAuthStore } from '~/store/auth.store'
 
 export default function OnboardingScreen() {
   const [handle, setHandle] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  async function handleComplete() {
+  const session = useAuthStore((s) => s.session)
+  const register = useRegister(session?.access_token)
+
+  function handleComplete() {
     const result = RegisterSchema.safeParse({ handle, displayName })
     if (!result.success) {
       Alert.alert('Check your input', result.error.errors[0]?.message)
       return
     }
 
-    setIsSubmitting(true)
-
-    const { data: sessionData } = await supabase.auth.getSession()
-    const token = sessionData.session?.access_token
-
-    if (!token) {
-      setIsSubmitting(false)
-      Alert.alert('Session error', 'Please sign in again.')
-      return
-    }
-
-    const res = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(result.data),
+    register.mutate(result.data, {
+      onSuccess: () => router.replace('/(tabs)/neighborhood'),
+      onError: (err) => Alert.alert('Registration failed', err.message),
     })
-
-    setIsSubmitting(false)
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { message?: string }
-      Alert.alert('Registration failed', body.message ?? 'Something went wrong')
-      return
-    }
-
-    router.replace('/(tabs)/neighborhood')
   }
 
-  const canSubmit = handle.length >= 3 && displayName.length >= 1 && !isSubmitting
+  const canSubmit = handle.length >= 3 && displayName.length >= 1 && !register.isPending
 
   return (
     <SafeAreaView className="flex-1 bg-slate-950">
@@ -95,7 +72,7 @@ export default function OnboardingScreen() {
           disabled={!canSubmit}
         >
           <Text className="text-white font-semibold text-base">
-            {isSubmitting ? 'Creating profile…' : 'Get started'}
+            {register.isPending ? 'Creating profile…' : 'Get started'}
           </Text>
         </Pressable>
       </View>

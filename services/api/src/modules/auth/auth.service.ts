@@ -3,8 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { DatabaseService } from '../../database/database.service'
 import { SUPABASE_CLIENT } from '../../supabase/supabase.module'
 import { toFullProfile } from '../users/utils/profile.mapper'
-import type { FullProfile } from '../users/utils/profile.mapper'
-import type { RegisterInput } from '@truthlayer/shared'
+import type { FullProfile, RegisterInput } from '@truthlayer/shared'
 
 @Injectable()
 export class AuthService {

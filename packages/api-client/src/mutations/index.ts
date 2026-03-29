@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../client'
 import { queryKeys } from '../query-keys'
-import type { RegisterInput, UpdateProfileInput } from '@truthlayer/shared'
-import type { OwnProfileResponse } from '../queries/index'
+import type { FullProfile, RegisterInput, UpdateProfileInput } from '@truthlayer/shared'
 
 export function useRegister(token: string | undefined) {
   const queryClient = useQueryClient()
@@ -21,7 +20,7 @@ export function useUpdateProfile(token: string | undefined) {
 
   return useMutation({
     mutationFn: (input: UpdateProfileInput) =>
-      apiRequest<OwnProfileResponse>('/users/me', { method: 'PATCH', token, body: input }),
+      apiRequest<FullProfile>('/users/me', { method: 'PATCH', token, body: input }),
     onSuccess: (updated) => {
       // Optimistic update — avoids a refetch round-trip
       queryClient.setQueryData(queryKeys.users.me(), updated)

@@ -2,8 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import type { Prisma } from '@truthlayer/database'
 import { DatabaseService } from '../../database/database.service'
 import { toFullProfile, toPublicProfile } from './utils/profile.mapper'
-import type { FullProfile, PublicProfile } from './utils/profile.mapper'
-import type { UpdateProfileInput } from '@truthlayer/shared'
+import type { FullProfile, PublicProfile, UpdateProfileInput } from '@truthlayer/shared'
 
 @Injectable()
 export class UsersService {
