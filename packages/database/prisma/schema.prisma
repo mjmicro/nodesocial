@@ -171,7 +171,6 @@ model ReputationScore {
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, domain])
-  @@index([userId])
   @@index([domain]) // leaderboard queries: top users per domain
 }
 
@@ -211,7 +210,6 @@ model WeeklyDelta {
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, domain, weekStart])
-  @@index([userId, domain])
   @@index([weekStart]) // weekly batch job processes all users by week start date
 }
 

@@ -1,0 +1,18 @@
+# Build output
+dist/
+
+# TypeScript incremental cache
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+logs/

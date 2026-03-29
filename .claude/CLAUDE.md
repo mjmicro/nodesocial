@@ -82,12 +82,19 @@ apps/app/src/
 ├── app/          ← Expo Router file-based routes
 ├── components/   ← NativeWind styled UI
 ├── hooks/        ← React Query hooks
-└── store/        ← Zustand global state
+├── store/        ← Zustand global state
+└── utils/        ← Shared helpers (supabase client, route-after-auth, etc.)
 ```
 NativeWind (Tailwind) for all styling. Never use `StyleSheet.create`.
 
+Always import `API_URL` from `@truthlayer/api-client` — never use `process.env.EXPO_PUBLIC_API_URL` directly in app code.
+
+After auth (OTP or magic link), use `routeAfterAuth(token)` from `~/utils/route-after-auth` — don't duplicate the `/users/me` → onboarding/neighborhood routing logic.
+
 ### 6. Supabase Auth in NestJS
 Verify JWT in `common/guards/supabase-auth.guard.ts`. Always extract userId from verified JWT — never trust client-provided IDs.
+
+The Supabase admin client is provided globally by `SupabaseModule` (`services/api/src/supabase/supabase.module.ts`). Inject it with `@Inject(SUPABASE_CLIENT)` — never call `createClient()` directly in a service or guard.
 
 ---
 
@@ -95,6 +102,7 @@ Verify JWT in `common/guards/supabase-auth.guard.ts`. Always extract userId from
 
 | Module | Responsibility |
 |--------|---------------|
+| `supabase` | Global `SUPABASE_CLIENT` provider (admin client, injected everywhere) |
 | `auth` | JWT verification, session management |
 | `users` | Profiles, domain reputation display |
 | `missions` | Lifecycle, scope escalation |
@@ -127,12 +135,15 @@ Validated with Zod in `services/api/src/config/env.schema.ts`.
 ```
 DATABASE_URL
 SUPABASE_URL · SUPABASE_ANON_KEY · SUPABASE_SERVICE_KEY
-UPSTASH_REDIS_URL · UPSTASH_REDIS_TOKEN
+UPSTASH_REDIS_URL · UPSTASH_REDIS_TOKEN   ← REST client (@upstash/redis) for cache reads
+REDIS_URL                                  ← ioredis (rediss://) for BullMQ queues
 CLOUDFLARE_R2_BUCKET · CLOUDFLARE_R2_ACCOUNT_ID · R2_ACCESS_KEY_ID · R2_SECRET_ACCESS_KEY
 TYPESENSE_HOST · TYPESENSE_API_KEY
 JWT_SECRET
 REPUTATION_SERVICE_URL
 ```
+
+Expo app vars (prefix `EXPO_PUBLIC_`): `EXPO_PUBLIC_SUPABASE_URL` · `EXPO_PUBLIC_SUPABASE_ANON_KEY` · `EXPO_PUBLIC_API_URL` (LAN IP for physical devices; on web `API_URL` auto-resolves via `window.location.hostname`).
 
 ---
 

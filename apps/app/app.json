@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "TruthLayer",
+    "slug": "truthlayer",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./src/assets/icons/icon.png",
+    "scheme": "truthlayer",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.truthlayer.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is required to verify reports with photos.",
+        "NSLocationWhenInUseUsageDescription": "Location is required to show your neighborhood feed."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.truthlayer.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "CAMERA"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./src/assets/icons/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera is required to verify reports with photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Location is required to show your neighborhood feed."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -8,11 +8,13 @@ dist/
 build/
 .next/
 .expo/
+out/
 
 # Env files
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # Turbo cache
 .turbo/
@@ -20,20 +22,68 @@ build/
 # Prisma
 *.db
 *.db-journal
+# keep generated client out — it's rebuilt from schema
+packages/database/node_modules/.prisma/
+
+# TypeScript incremental compilation cache
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+.nyc_output/
 
 # OS
 .DS_Store
+.DS_Store?
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # IDE
 .idea/
 .vscode/settings.json
+*.swp
+*.swo
 
 # Logs
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+
+# Runtime temp files
+*.pid
+*.seed
+*.pid.lock
 
 # Local history (VSCode extension)
 .history/
+
+# Expo / EAS
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# NestJS
+services/api/dist/
+
+# Typesense local node data
+typesense-data/
+
+# Python (reputation service)
+services/reputation/__pycache__/
+services/reputation/**/__pycache__/
+services/reputation/.venv/
+services/reputation/venv/
+services/reputation/*.pyc
+services/reputation/.pytest_cache/
+services/reputation/htmlcov/
+services/reputation/.coverage
+services/reputation/dist/
