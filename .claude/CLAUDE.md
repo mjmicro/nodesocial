@@ -1,16 +1,10 @@
-# TruthLayer — Project Brief for Claude Code
+# TruthLayer — Claude Code Instructions
 
 ## What is TruthLayer?
 
-TruthLayer is a civic social networking platform that replaces the attention economy with an impact economy. Users report local problems, collaborate to solve them, verify outcomes with photos, and earn XP/reputation for real-world contribution. It fights misinformation through structural design — not moderation.
+Civic social platform replacing the attention economy with an impact economy. Users report local problems, verify outcomes with photos, earn XP/reputation for real-world contribution. Fights misinformation through structure, not moderation.
 
-## Core Philosophy
-
-- **No ads, ever.** Revenue comes from subscriptions, B2B API, and institutional licenses.
-- **Local-first.** The default screen is "Neighborhoods" (2km radius). 50 users in one colony > 50,000 scattered globally.
-- **Fun, not preachy.** Gamification (XP, levels, daily quests, badges, streaks, leaderboards) makes civic action feel like a multiplayer game.
-- **Context, not censorship.** Unverified content is tagged and slowed, never removed.
-- **Camera-first verification.** Issue reports and resolution claims require in-app camera capture (no gallery uploads) with live GPS, device attestation, and timestamp.
+**Core rules:** No ads ever · Camera-first verification (no gallery for reports) · Local-first (2km neighborhoods) · Context over censorship (tag + slow, never remove) · Fun via gamification
 
 ---
 
@@ -18,182 +12,149 @@ TruthLayer is a civic social networking platform that replaces the attention eco
 
 | Layer | Technology |
 |---|---|
-| Mobile | React Native + Expo, TypeScript |
-| Web | Next.js 15, React, PWA |
-| API | Node.js, GraphQL (Apollo Server), REST for B2B |
-| Reputation service | Python, FastAPI, event-sourced, Redis cache |
-| AI/ML | Python, fine-tuned LLM (content classification), RAG (claim verification), GNN (bot detection) |
-| Primary DB | PostgreSQL 16, partitioned, read replicas |
-| Graph DB | Neo4j (social graph, reputation relationships, collusion detection) |
-| Event streaming | Apache Kafka |
-| Search | Elasticsearch (full-text + semantic via embeddings) |
-| Object storage | AWS S3 / Cloudflare R2 |
-| Infrastructure | AWS/GCP, Kubernetes, Terraform, GitHub Actions CI/CD |
+| App (web + iOS + Android) | Expo Universal, Expo Router, NativeWind, TypeScript |
+| Backend API | NestJS + Fastify adapter, Node.js, TypeScript |
+| ORM | Prisma — schema is single source of truth |
+| Database | PostgreSQL 16 via Supabase |
+| Auth | Supabase Auth (JWT, phone + email) |
+| Realtime | Supabase Realtime |
+| Cache + Queue | Upstash Redis + BullMQ |
+| Search | Typesense (→ Elasticsearch later) |
+| Storage | Cloudflare R2 |
+| CDN + DDoS | Cloudflare |
+| Reputation service | Python FastAPI (`services/reputation/`) |
+| Monorepo | Turborepo |
+| Hosting | Vercel (web) · Expo EAS (mobile) · Fly.io (API + Python) |
 
 ---
 
-## Core Systems
+## Monorepo Structure
 
-### 1. Hybrid Reputation Engine
-
-**Formula:**
 ```
-HYBRID_SCORE = (FOUNDATION * 0.30) + (ACTIVE * 0.70)
-
-FOUNDATION = clamp(all_time_accuracy_rate * 100, floor=15, ceil=100)
-ACTIVE = clamp(base_50 + sum(weekly_deltas * recency_weight), floor=0, ceil=100)
+truthlayer/
+├── apps/app/                        ← Expo Universal (web + iOS + Android)
+├── packages/
+│   ├── database/prisma/schema.prisma ← SOURCE OF TRUTH for all data types
+│   ├── shared/                       ← Zod schemas, TS types, constants
+│   └── api-client/                   ← Typed API client for Expo
+└── services/
+    ├── api/                          ← NestJS + Fastify
+    └── reputation/                   ← Python FastAPI
 ```
 
-**Recency weights (13-week rolling window):**
-- Week 1: 1.00, Week 2: 0.92, Week 3: 0.85, Week 4: 0.78
-- Week 5: 0.72, Week 6: 0.65, Week 7: 0.58, Week 8: 0.50
-- Week 9: 0.42, Week 10: 0.35, Week 11: 0.28, Week 12: 0.20, Week 13: 0.12
-
-**Signal weights:**
-- Positive: verified_claim +3.0, credible_reaction +0.15, helpful_note +2.0, source_link +0.5, successful_appeal +4.0, accurate_dispute +1.0
-- Negative: debunked_claim -5.0, upheld_dispute -0.25, upheld_report -8.0, frivolous_report -2.0, misclassification -1.5, coordinated_flag -30.0
-
-**Reach tiers (based on ACTIVE score only):**
-- Full reach: 75+
-- Standard: 50-74
-- Reduced: 25-49
-- Sandboxed: 0-24
-
-**Domain-specific:** Scores are independent per domain (science, health, politics, technology, environment, economics, local_news, breaking_news, history, sports). Cross-domain influence is zero.
-
-**Anti-gaming:** Weekly caps on positive signals, asymmetric negative scoring, reporter reputation gating (reports from <25 rep users are ignored), coordinated attack detection (20+ reports in 1 hour from similar accounts = freeze), 2-week probation sandbox for new accounts.
-
-### 2. Engagement Model
-
-Replace likes/dislikes/follows with:
-- **Credible** (swipe right) — "I believe this is accurate." Only affects rep on fact-claims.
-- **Dispute** (swipe left) — Requires reason: inaccurate, misleading context, missing source, outdated.
-- **Trust** (long press) — Domain-specific. Trust @user in "science" ≠ trust them in "politics."
-
-### 3. Content Classification
-
-Every post is tagged at creation: fact-claim, opinion, satire, question, or personal experience. User selects, AI suggests corrections. Misclassification costs -1.5 rep.
-
-### 4. Neighborhoods (Local System)
-
-- Users get a "Neighborhood" based on location (~2km radius).
-- Neighborhood tab is the default home screen.
-- Anyone can report a problem: take in-app photo + drop pin + select category.
-- Issues escalate to "Active" when 3+ unique neighbors confirm with their own photos.
-- Missions follow lifecycle: Identify → Research → Propose → Act → Measure.
-- Resolution requires 5 independent verifiers with their own photos + 48-hour dispute window.
-- 7-day re-verification for infrastructure fixes.
-- Solved missions stay visible permanently as proof.
-
-### 5. Scope System (Local → Global)
-
-| Scope | Radius | Verifiers needed | Auto-escalation trigger |
-|---|---|---|---|
-| Street | 200m | 3 within 200m | — |
-| Neighborhood | 2km | 5 from different streets | 3+ street missions same category |
-| City | Municipal boundary | 50+ from 5+ neighborhoods | 5+ neighborhoods same issue |
-| National | Country | 500+ from 10+ cities | 10+ cities same issue |
-| Global | Worldwide | International data sources | 3+ countries same issue |
-
-### 6. Verification Pipeline (Anti-Fraud)
-
-Six layers, in order:
-
-1. **Device & location** (instant): Live GPS match within 200m, timestamp freshness <15min, device attestation (SafetyNet/DeviceCheck), network fingerprint vs GPS.
-2. **AI image analysis** (instant): AI-generated detection, manipulation/ELA scan, reverse image search, relevance matching (does image match category?).
-3. **Community cross-verification** (minutes): 3+ unique neighbor confirmations with diverse photos, reputation-weighted.
-4. **Resolution verification**: Before/after photo matching, 5-verifier rule, 7-day re-verification, 48-hour dispute window.
-5. **Pattern detection** (ongoing): Frequency analysis (5+/week flagged), resolution rate tracking, collusion ring detection via graph analysis.
-6. **Consequences**: Fake = -15 rep, 90-day pre-approval after 1 fake, permanent pre-approval after 2, visible "fake - debunked" tag on profile.
-
-**Camera-first rule:** Issue reports and resolution claims MUST use in-app camera. Gallery uploads blocked for these. Gallery allowed only for supplementary evidence (screenshots of official responses), marked as "unverified."
-
-### 7. Gamification System
-
-**XP & Levels:**
-- Every action earns XP. Levels unlock abilities.
-- Level 1-2 "Observer": report, join, verify
-- Level 3-4 "Contributor": create missions, propose solutions
-- Level 5-7 "Changemaker": coordinate missions, mentor
-- Level 8-10 "Problem Solver": city-scope missions, expert voting
-- Level 11+ "Catalyst": national missions, community moderator
-
-**Daily quests:** 4 quick tasks per day (~2 min each), contextual to neighborhood activity. Completing all 4 = bonus XP. Quests rotate daily.
-
-**Badges:** Earned through specific real contributions (First Responder, Fixer, Truth Seeker, Neighborhood Hero, Bridge Builder, Streak Master, City Catalyst, Global Solver).
-
-**Streaks:** Daily activity streak with 2 free freezes/month. Logarithmic bonuses (Day 1-7: +5 XP/day, Day 8-30: +10, Day 31-90: +15, Day 91+: +20).
-
-**Leaderboards:** Neighborhood-first (weekly reset), then city (unlocks at Level 8). Based on verified impact, not raw activity. Always show "X XP to next rank."
-
-**Anti-addiction:** Daily XP cap (200/day), "you're caught up" endpoint, no notifications 10PM-7AM default, weekly impact summary instead of daily stats.
-
-### 8. UX Principles
-
-- **3-tap rule:** Every core action completable in 3 taps from home screen.
-- **Swipe interaction:** Right = Credible, Left = Dispute, Long press = Trust.
-- **No follower counts, no selfies, no "posts" tab** on profiles. Identity = level + badges + impact.
-- **Micro-celebrations:** Level-up animation, mission-solved confetti, streak milestones, ripple effect notifications ("Your template used in Pune!"), badge unlock envelopes.
-- **Progress notifications** replace likes: "Your solution got 47 credible endorsements," not "X liked your post."
+**Workspace aliases:** `@truthlayer/database` · `@truthlayer/shared` · `@truthlayer/api-client`
 
 ---
 
-## Database Schema (PostgreSQL)
+## Architecture Rules
 
-See the full schema in `reputation_engine.py`. Key tables:
-- `users` — identity, verification, probation status, coordinated behavior flag
-- `reputation_scores` — materialized scores per user per domain
-- `weekly_deltas` — 13-week rolling window snapshots
-- `reputation_events` — append-only event log (immutable for auditability)
-- `reports` — with reporter weight, coordinated attack detection
-- `missions` — lifecycle stages, scope, verification status
-- `mission_participants` — roles, contributions, XP earned
-- `images` — authenticity scores, verification pipeline results
+### 1. Prisma = single source of truth
+Never manually define a type that mirrors a Prisma model — import it from `@truthlayer/database`. After any schema change run `prisma generate` before touching other files.
 
----
+### 2. NestJS module pattern — every feature follows this exactly
+```
+services/api/src/modules/<feature>/
+├── <feature>.module.ts
+├── <feature>.controller.ts   ← HTTP handlers only, zero business logic
+├── <feature>.service.ts      ← all business logic lives here
+├── dto/
+└── entities/
+```
 
-## MVP Build Order (Months 1-6)
+### 3. Shared types go in `@truthlayer/shared`
+Zod schemas → `packages/shared/src/validators/`
+TypeScript types → `packages/shared/src/types/`
+Constants (domains, reach tiers, XP values, queue names) → `packages/shared/src/constants/`
 
-### Month 1-2: Foundation
-- Auth (phone + email + device fingerprint)
-- User profiles with domain reputation display
-- PostgreSQL schema
-- GraphQL API layer
-- React Native shell with navigation
-- Basic feed rendering
-- CI/CD pipeline
+### 4. BullMQ pattern
+```
+services/api/src/queue/
+├── jobs/<feature>.job.ts          ← payload type + queue name constant
+└── processors/<feature>.processor.ts  ← @Processor decorator
+```
+Services enqueue. Processors handle. Never do heavy work synchronously in a request.
 
-### Month 3-4: Core Features
-- Reputation engine (hybrid scoring, weekly recalculation)
-- Content classification (fact/opinion/satire tagging)
-- Credible/Dispute/Trust interactions (swipe gestures)
-- Neighborhood system (location-based, 2km radius)
-- Issue reporting (camera-first, GPS verification)
-- Community confirmation flow
-- Fake profile defense layers 1-2
+### 5. Expo app structure
+```
+apps/app/src/
+├── app/          ← Expo Router file-based routes
+├── components/   ← NativeWind styled UI
+├── hooks/        ← React Query hooks
+└── store/        ← Zustand global state
+```
+NativeWind (Tailwind) for all styling. Never use `StyleSheet.create`.
 
-### Month 5-6: MVP Launch
-- Mission boards with lifecycle stages
-- Resolution verification (5-verifier rule)
-- XP system, levels, daily quests
-- Badges and streak system
-- Neighborhood leaderboard
-- Image verification pipeline (AI-gen detection, manipulation scan)
-- Invite-only beta with 500 seed users
+### 6. Supabase Auth in NestJS
+Verify JWT in `common/guards/supabase-auth.guard.ts`. Always extract userId from verified JWT — never trust client-provided IDs.
 
 ---
 
-## Revenue Model
+## NestJS Modules
 
-- Premium subscriptions (35%): $8/month. Advanced analytics, priority verification, expert tools.
-- Verification API B2B (25%): Newsrooms and researchers pay for claim-checking API.
-- Institutional licenses (20%): Universities, government, NGOs.
-- Impact marketplace (12%): Platform fee on expert consultations and project tools.
-- Anonymized data insights (8%): Aggregated trend data for researchers and policy orgs.
+| Module | Responsibility |
+|--------|---------------|
+| `auth` | JWT verification, session management |
+| `users` | Profiles, domain reputation display |
+| `missions` | Lifecycle, scope escalation |
+| `neighborhoods` | Location-based grouping, 2km radius |
+| `reports` | Issue reporting, camera + GPS validation |
+| `reputation` | Score reads (Redis cache-first), event emission |
+| `search` | Typesense integration |
+| `notifications` | BullMQ-backed push + in-app alerts |
+| `b2b` | REST API for newsrooms/researchers |
 
 ---
 
-## Key Files
+## Key Conventions
 
-- `reputation_engine.py` — Complete scoring algorithm, anti-gaming protections, DB schema
-- `TruthLayer_Product_Vision.docx` — Full strategy document for investors/co-founders
+**TypeScript:** Strict mode always · No `any` — use `unknown` and narrow · Zod for all runtime validation · Infer types from Zod: `type X = z.infer<typeof XSchema>`
+
+**Prisma:** Use `select` to limit returned fields · Transactions for operations touching >1 table · No raw SQL unless Prisma can't express the query
+
+**BullMQ:** Jobs must be idempotent (may retry) · `attempts: 3`, `backoff: { type: 'exponential' }` on all jobs · Queue names are constants in `@truthlayer/shared`
+
+**Cloudflare R2:** Generate signed upload URLs — client uploads direct to R2, then sends key to API. Never stream files through the API server.
+
+---
+
+## Environment Variables
+
+Validated with Zod in `services/api/src/config/env.schema.ts`.
+
+```
+DATABASE_URL
+SUPABASE_URL · SUPABASE_ANON_KEY · SUPABASE_SERVICE_KEY
+UPSTASH_REDIS_URL · UPSTASH_REDIS_TOKEN
+CLOUDFLARE_R2_BUCKET · CLOUDFLARE_R2_ACCOUNT_ID · R2_ACCESS_KEY_ID · R2_SECRET_ACCESS_KEY
+TYPESENSE_HOST · TYPESENSE_API_KEY
+JWT_SECRET
+REPUTATION_SERVICE_URL
+```
+
+---
+
+## Key Files & Docs
+
+| File | Purpose |
+|------|---------|
+| `packages/database/prisma/schema.prisma` | DB schema — source of truth |
+| `services/reputation/src/engine/reputation_engine.py` | Scoring algorithm (757 lines) |
+| `docs/architecture/reputation-engine.md` | Formula, weights, NestJS integration |
+| `docs/architecture/verification-pipeline.md` | 6-layer anti-fraud pipeline |
+| `docs/product/gamification.md` | XP, levels, badges, streaks, quests |
+| `docs/product/scope-system.md` | Neighborhood model, scope escalation |
+| `docs/product/engagement-model.md` | Credible/Dispute/Trust, content types, UX |
+| `docs/product/roadmap.md` | MVP build order (months 1–6) |
+
+---
+
+## Never Do
+
+- Define types that duplicate Prisma models
+- Put business logic in NestJS controllers
+- Call the reputation service synchronously from a request — use BullMQ
+- Use `any` in TypeScript
+- Upload files through the API — use signed R2 URLs
+- Hardcode queue names, domain names, XP values, or reach tier thresholds
+- Bypass the Supabase JWT guard on authenticated routes
+- Delete or update `ReputationEvent` rows — append-only
