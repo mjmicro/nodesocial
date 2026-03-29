@@ -6,10 +6,10 @@ Every action earns XP. Levels unlock abilities.
 
 | Level | Title | Unlocks |
 |-------|-------|---------|
-| 1–2 | Observer | Report issues, join missions, verify |
-| 3–4 | Contributor | Create missions, propose solutions |
-| 5–7 | Changemaker | Coordinate missions, mentor others |
-| 8–10 | Problem Solver | City-scope missions, expert voting |
+| 1–2 | Observer | Report issues, join missions, verify · Post content (all types), react to posts (credible/dispute/trust) |
+| 3–4 | Contributor | Create missions, propose solutions · Fact claims with domain tags |
+| 5–7 | Changemaker | Coordinate missions, mentor others · Post reach boost in neighborhood feed |
+| 8–10 | Problem Solver | City-scope missions, expert voting · City leaderboard |
 | 11+ | Catalyst | National missions, community moderator |
 
 ## Daily XP Cap
@@ -40,7 +40,7 @@ Earned through specific verified contributions only — never for passive activi
 
 ## Streaks
 
-- Daily activity streak (any verified action counts)
+- Daily activity streak (any verified action counts — civic or social: report, confirm, post, react)
 - **2 free streak freezes per month**
 - Streak bonus (additive on top of base XP):
 
@@ -55,7 +55,7 @@ Earned through specific verified contributions only — never for passive activi
 
 - **Neighborhood leaderboard** — weekly reset, available from Level 1
 - **City leaderboard** — unlocks at Level 8
-- Ranked by **verified impact**, not raw XP
+- Ranked by **verified impact**, not raw XP — counts both civic contributions (resolved missions) and social contributions (verified fact claims, accurate disputes)
 - Always display "X XP to next rank" — never show a dead end
 
 ## Anti-Addiction Rules

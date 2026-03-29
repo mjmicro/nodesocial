@@ -41,6 +41,7 @@ export const QUEUES = {
   IMAGE_VERIFICATION: 'image-verification',
   NOTIFICATIONS: 'notifications',
   SEARCH_INDEX: 'search-index',
+  POST_REACTIONS: 'post-reactions',
 } as const
 
 // Scope system
@@ -75,6 +76,26 @@ export const MISSION_STAGES = [
 ] as const
 
 export type MissionStage = (typeof MISSION_STAGES)[number]
+
+// Post engagement reactions (runtime array — type ReactionType comes from @prisma/client)
+export const REACTION_TYPES = ['credible', 'dispute', 'trust'] as const
+
+// Slow-mode reasons (context over censorship — tag + slow, never remove)
+// Runtime array — type SlowModeReason comes from @prisma/client
+export const SLOW_MODE_REASONS = [
+  'low_reputation_source',
+  'coordinated_flag',
+  'misclassification',
+  'disputed_claim',
+] as const
+
+// Mission participant roles (runtime array — type MissionParticipantRole comes from @prisma/client)
+export const MISSION_PARTICIPANT_ROLES = [
+  'verifier',
+  'contributor',
+  'coordinator',
+  'mentor',
+] as const
 
 // Reputation signal weights
 export const SIGNAL_WEIGHTS = {

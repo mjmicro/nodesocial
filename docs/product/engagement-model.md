@@ -1,12 +1,27 @@
 # Engagement Model & Content Classification
 
-## Engagement Actions (replaces likes/follows)
+## Two Content Tracks
 
-| Action | Gesture | Meaning | Rep effect |
-|--------|---------|---------|------------|
-| **Credible** | Swipe right | "I believe this is accurate" | Affects rep only on fact-claims |
-| **Dispute** | Swipe left | "This is wrong or misleading" | Requires a reason (see below) |
-| **Trust** | Long press | "I trust this person in this domain" | Domain-specific, not global |
+TruthLayer has two parallel content surfaces — users can participate in either or both:
+
+| Track | Model | Created by | Core action |
+|-------|-------|-----------|-------------|
+| **Civic** | `Report` → `Mission` | Camera + GPS mandatory | File issue, confirm, solve |
+| **Social** | `Post` | Text-first, photo optional | Share, fact-check, discuss |
+
+Posts are **never deleted**. Moderation = `isSlowed` flag + `slowReason` label on the post. The community sees context, not a void.
+
+---
+
+## Engagement Actions on Posts (replaces likes/follows)
+
+| Action | Gesture | Prisma model | Meaning | Rep effect |
+|--------|---------|-------------|---------|------------|
+| **Credible** | Swipe right | `PostReaction { reaction: CREDIBLE }` | "I believe this is accurate" | Affects rep only on `FACT_CLAIM` posts |
+| **Dispute** | Swipe left | `PostReaction { reaction: DISPUTE }` | "This is wrong or misleading" | Requires a reason (see below) |
+| **Trust** | Long press | `PostReaction { reaction: TRUST }` | "I trust this person in this domain" | Domain-specific, not global |
+
+One reaction per user per post (`@@unique([postId, userId])`). Changing reaction updates the existing row.
 
 ### Dispute reasons (required)
 - Inaccurate information
@@ -15,25 +30,42 @@
 - Outdated information
 
 ### Trust model
-- Trust is **domain-specific**: trusting @user in "science" ≠ trusting them in "politics"
+- Trust is **domain-specific**: trusting @user in `science` ≠ trusting them in `politics`
 - Trust affects how their content is weighted in your feed
 - No public "follower count" — trust is private and directional
 
-## Content Classification
+---
+
+## Content Classification (`ContentType`)
 
 Every post is tagged at creation. User selects, AI suggests a correction if it disagrees.
 
-| Type | Description |
-|------|-------------|
-| `fact-claim` | Asserts something is objectively true |
-| `opinion` | Personal view or interpretation |
-| `satire` | Clearly labelled humorous/satirical content |
-| `question` | Asking for information or opinions |
-| `personal_experience` | First-person account, not a general claim |
+| Type | DB value | Description |
+|------|----------|-------------|
+| Fact claim | `fact_claim` | Asserts something is objectively true |
+| Opinion | `opinion` | Personal view or interpretation |
+| Satire | `satire` | Clearly labelled humorous/satirical content |
+| Question | `question` | Asking for information or opinions |
+| Personal experience | `personal_experience` | First-person account, not a general claim |
 
-- Misclassification (AI-confirmed): **-1.5 rep**
-- Only `fact-claim` posts are eligible for Credible/Dispute rep effects
-- `opinion` and `personal_experience` posts cannot be Disputed on accuracy grounds
+- Misclassification (AI-confirmed): **-1.5 rep** via BullMQ
+- Only `FACT_CLAIM` posts are eligible for Credible/Dispute rep effects
+- `OPINION` and `PERSONAL_EXPERIENCE` posts cannot be Disputed on accuracy grounds
+
+### Optional domain tag (`ReputationDomain`)
+Fact claims can be tagged with a domain (science, health, politics, etc.) to feed domain-specific reputation scoring. Other content types can be tagged too, but only `FACT_CLAIM` generates rep signal.
+
+---
+
+## Slow Mode
+
+Posts are never removed. When flagged:
+- `Post.isSlowed = true`
+- `Post.slowReason` set to one of: `low_reputation_source` | `coordinated_flag` | `misclassification` | `disputed_claim`
+- Post renders with a visible context label explaining why it's limited
+- Distribution is throttled, not zeroed
+
+---
 
 ## Profile Design
 
@@ -47,6 +79,8 @@ Profile shows:
 - Neighborhoods active in
 - Missions contributed to
 - Domain reputation bars (per domain, not a single number)
+
+---
 
 ## UX Principles
 

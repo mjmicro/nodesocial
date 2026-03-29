@@ -1,10 +1,382 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
 }
 
-// Full schema added on Day 2
+// ── Geospatial strategy ───────────────────────────────────────────────────────
+// Models with location data store BOTH raw (lat, lng) floats for client
+// serialization AND a PostGIS geometry column for ST_DWithin radius queries.
+// Application writes lat + lng; keep geometry in sync at write time.
+// GIST indexes must be added manually in the migration SQL (Prisma limitation):
+//   CREATE INDEX "<Model>_location_gist_idx" ON "<Model>" USING GIST (location);
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum ReputationDomain {
+  SCIENCE       @map("science")
+  HEALTH        @map("health")
+  POLITICS      @map("politics")
+  TECHNOLOGY    @map("technology")
+  ENVIRONMENT   @map("environment")
+  ECONOMICS     @map("economics")
+  LOCAL_NEWS    @map("local_news")
+  BREAKING_NEWS @map("breaking_news")
+  HISTORY       @map("history")
+  SPORTS        @map("sports")
+}
+
+enum ReachTier {
+  FULL      @map("full")
+  STANDARD  @map("standard")
+  REDUCED   @map("reduced")
+  SANDBOXED @map("sandboxed")
+}
+
+enum ExpertiseLevel {
+  VERIFIED_EXPERT @map("verified_expert")
+  ESTABLISHED     @map("established")
+  CONTRIBUTOR     @map("contributor")
+  NEWCOMER        @map("newcomer")
+}
+
+enum ContentType {
+  FACT_CLAIM          @map("fact_claim")
+  OPINION             @map("opinion")
+  SATIRE              @map("satire")
+  QUESTION            @map("question")
+  PERSONAL_EXPERIENCE @map("personal_experience")
+}
+
+enum MissionStage {
+  IDENTIFY @map("identify")
+  RESEARCH @map("research")
+  PROPOSE  @map("propose")
+  ACT      @map("act")
+  MEASURE  @map("measure")
+}
+
+enum Scope {
+  STREET       @map("street")
+  NEIGHBORHOOD @map("neighborhood")
+  CITY         @map("city")
+  NATIONAL     @map("national")
+  GLOBAL       @map("global")
+}
+
+enum ReportStatus {
+  PENDING  @map("pending")
+  ACTIVE   @map("active")
+  RESOLVED @map("resolved")
+  REJECTED @map("rejected")
+}
+
+enum ReputationEventType {
+  VERIFIED_CLAIM    @map("verified_claim")
+  DEBUNKED_CLAIM    @map("debunked_claim")
+  CREDIBLE_REACTION @map("credible_reaction")
+  HELPFUL_NOTE      @map("helpful_note")
+  SOURCE_LINK       @map("source_link")
+  SUCCESSFUL_APPEAL @map("successful_appeal")
+  ACCURATE_DISPUTE  @map("accurate_dispute")
+  UPHELD_DISPUTE    @map("upheld_dispute")
+  UPHELD_REPORT     @map("upheld_report")
+  FRIVOLOUS_REPORT  @map("frivolous_report")
+  MISCLASSIFICATION @map("misclassification")
+  COORDINATED_FLAG  @map("coordinated_flag")
+}
+
+enum ReactionType {
+  CREDIBLE @map("credible")
+  DISPUTE  @map("dispute")
+  TRUST    @map("trust")
+}
+
+enum SlowModeReason {
+  LOW_REPUTATION_SOURCE @map("low_reputation_source")
+  COORDINATED_FLAG      @map("coordinated_flag")
+  MISCLASSIFICATION     @map("misclassification")
+  DISPUTED_CLAIM        @map("disputed_claim")
+}
+
+enum MissionParticipantRole {
+  VERIFIER    @map("verifier")
+  CONTRIBUTOR @map("contributor")
+  COORDINATOR @map("coordinator")
+  MENTOR      @map("mentor")
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id                      String    @id
+  handle                  String    @unique
+  displayName             String
+  email                   String?   @unique
+  phoneHash               String?   @unique
+  deviceFingerprint       String?
+  identityVerified        Boolean   @default(false)
+  lat                     Float?
+  lng                     Float?
+  location                Unsupported("geometry(Point, 4326)")?
+  xp                      Int       @default(0)
+  level                   Int       @default(1)
+  streakDays              Int       @default(0)
+  lastStreakDate          DateTime?
+  streakFreezeCount       Int       @default(2)
+  dailyXpEarned           Int       @default(0)
+  dailyXpResetAt          DateTime?
+  probationUntil          DateTime?
+  coordinatedBehaviorFlag Boolean   @default(false)
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  lastPostAt              DateTime?
+
+  reputationScores    ReputationScore[]
+  weeklyDeltas        WeeklyDelta[]
+  subjectEvents       ReputationEvent[]    @relation("SubjectEvents")
+  reporterEvents      ReputationEvent[]    @relation("ReporterEvents")
+  reports             Report[]             @relation("UserReports")
+  receivedReports     Report[]             @relation("TargetUserReports")
+  createdMissions     Mission[]
+  missionParticipants MissionParticipant[]
+  images              Image[]
+  posts               Post[]
+  postReactions       PostReaction[]
+}
+
+// One row per (user, domain) pair — 10 rows max per user.
+model ReputationScore {
+  id               String           @id @default(uuid())
+  userId           String
+  domain           ReputationDomain
+  foundationScore  Float            @default(15)
+  activeScore      Float            @default(50)
+  hybridScore      Float            @default(50)
+  totalFactClaims  Int              @default(0)
+  verifiedClaims   Int              @default(0)
+  debunkedClaims   Int              @default(0)
+  expertiseLevel   ExpertiseLevel   @default(NEWCOMER)
+  reachTier        ReachTier        @default(SANDBOXED)
+  voteWeight       Float            @default(1.0)
+  isProbation      Boolean          @default(false)
+  lastCalculatedAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, domain])
+  @@index([userId])
+  @@index([domain]) // leaderboard queries: top users per domain
+}
+
+// Rolling 13-week window — one row per (user, domain, week_start).
+model WeeklyDelta {
+  id     String           @id @default(uuid())
+  userId String
+  domain ReputationDomain
+
+  weekStart  DateTime @db.Date
+  weekNumber Int
+
+  // Activity counters (mirrors Python WeeklyActivity dataclass)
+  verifiedClaims     Int @default(0)
+  debunkedClaims     Int @default(0)
+  credibleReactions  Int @default(0)
+  disputesReceived   Int @default(0)
+  upheldReports      Int @default(0)
+  helpfulNotes       Int @default(0)
+  sourceLinks        Int @default(0)
+  frivolousReports   Int @default(0)
+  misclassifications Int @default(0)
+  successfulAppeals  Int @default(0)
+  accurateDisputes   Int @default(0)
+  daysSinceLastPost  Int @default(0)
+
+  // Computed deltas
+  positivePoints    Float @default(0)
+  negativePoints    Float @default(0)
+  inactivityPenalty Float @default(0)
+  netDelta          Float @default(0)
+  recencyWeight     Float @default(1.0)
+  weightedDelta     Float @default(0)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, domain, weekStart])
+  @@index([userId, domain])
+  @@index([weekStart]) // weekly batch job processes all users by week start date
+}
+
+// APPEND-ONLY — never update or delete rows.
+// sourceContentId is a polymorphic string ref to Post / Report / Mission id.
+model ReputationEvent {
+  id              String              @id @default(uuid())
+  userId          String
+  reporterId      String?
+  domain          ReputationDomain
+  eventType       ReputationEventType
+  points          Float
+  sourceContentId String?
+  reporterWeight  Float?
+  metadata        Json?
+  createdAt       DateTime            @default(now())
+
+  user     User  @relation("SubjectEvents", fields: [userId], references: [id])
+  reporter User? @relation("ReporterEvents", fields: [reporterId], references: [id])
+
+  @@index([userId, domain, createdAt]) // rolling 13-week window queries
+  @@index([userId, createdAt])         // user event history (cross-domain)
+  @@index([eventType])
+}
+
+// Civic issue report — mandatory GPS, camera-first photos.
+model Report {
+  id              String       @id @default(uuid())
+  reporterId      String
+  targetUserId    String?
+  targetContentId String?
+  category        String
+  contentType     ContentType?
+  status          ReportStatus @default(PENDING)
+  effectiveWeight Float        @default(1.0)
+  lat             Float
+  lng             Float
+  location        Unsupported("geometry(Point, 4326)")?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  reporter   User    @relation("UserReports", fields: [reporterId], references: [id])
+  targetUser User?   @relation("TargetUserReports", fields: [targetUserId], references: [id])
+  images     Image[]
+  mission    Mission?
+
+  @@index([reporterId])
+  @@index([targetUserId])
+  @@index([status])
+}
+
+// Community action lifecycle. primaryReportId is the report that triggered this mission.
+model Mission {
+  id              String       @id @default(uuid())
+  title           String
+  description     String?
+  category        String
+  scope           Scope        @default(STREET)
+  stage           MissionStage @default(IDENTIFY)
+  lat             Float
+  lng             Float
+  location        Unsupported("geometry(Point, 4326)")?
+  verifierCount   Int          @default(0)
+  confirmedAt     DateTime?
+  resolvedAt      DateTime?
+  createdById     String
+  primaryReportId String?      @unique
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  createdBy     User                 @relation(fields: [createdById], references: [id])
+  primaryReport Report?              @relation(fields: [primaryReportId], references: [id])
+  participants  MissionParticipant[]
+  images        Image[]
+
+  @@index([createdById])
+  @@index([scope, stage])
+}
+
+model MissionParticipant {
+  id        String                 @id @default(uuid())
+  missionId String
+  userId    String
+  role      MissionParticipantRole
+  joinedAt  DateTime               @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([missionId, userId])
+  @@index([missionId])
+  @@index([userId])
+}
+
+// Cloudflare R2 reference. Client uploads direct to R2; API stores the key only.
+// Polymorphic parent: belongs to exactly ONE of (report, post, mission).
+// Application enforces the exactly-one invariant; no DB CHECK constraint yet.
+model Image {
+  id         String    @id @default(uuid())
+  r2Key      String    @unique
+  userId     String
+  reportId   String?
+  postId     String?
+  missionId  String?
+  width      Int?
+  height     Int?
+  lat        Float?
+  lng        Float?
+  capturedAt DateTime?
+  isVerified Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  report  Report?  @relation(fields: [reportId], references: [id])
+  post    Post?    @relation(fields: [postId], references: [id])
+  mission Mission? @relation(fields: [missionId], references: [id])
+
+  @@index([userId])
+  @@index([reportId])
+  @@index([postId])
+  @@index([missionId])
+}
+
+// General social content — non-mission track (opinions, questions, fact claims, etc.).
+// Never delete — context over censorship means tag + slow only.
+model Post {
+  id          String            @id @default(uuid())
+  authorId    String
+  contentType ContentType
+  domain      ReputationDomain?
+  body        String
+  lat         Float?
+  lng         Float?
+  location    Unsupported("geometry(Point, 4326)")?
+  isSlowed    Boolean           @default(false)
+  slowReason  SlowModeReason?
+  // Denormalized cached counters for fast feed rendering.
+  // Atomically updated with PostReaction writes via post-reactions queue.
+  credibleCount Int @default(0)
+  disputeCount  Int @default(0)
+  trustCount    Int @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  author    User           @relation(fields: [authorId], references: [id])
+  images    Image[]
+  reactions PostReaction[]
+
+  @@index([authorId])
+  @@index([domain])
+  @@index([createdAt])
+}
+
+// One reaction per user per post.
+model PostReaction {
+  id        String       @id @default(uuid())
+  postId    String
+  userId    String
+  reaction  ReactionType
+  createdAt DateTime     @default(now())
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([postId, reaction]) // for maintaining Post.credibleCount / disputeCount / trustCount
+  @@index([userId])
+}

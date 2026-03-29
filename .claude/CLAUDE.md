@@ -4,6 +4,8 @@
 
 Civic social platform replacing the attention economy with an impact economy. Users report local problems, verify outcomes with photos, earn XP/reputation for real-world contribution. Fights misinformation through structure, not moderation.
 
+**Two content tracks:** Civic (Report → Mission for real-world problem-solving) · Social (Post for opinions, questions, fact claims with community engagement)
+
 **Core rules:** No ads ever · Camera-first verification (no gallery for reports) · Local-first (2km neighborhoods) · Context over censorship (tag + slow, never remove) · Fun via gamification
 
 ---
@@ -100,6 +102,7 @@ Verify JWT in `common/guards/supabase-auth.guard.ts`. Always extract userId from
 | `reports` | Issue reporting, camera + GPS validation |
 | `reputation` | Score reads (Redis cache-first), event emission |
 | `search` | Typesense integration |
+| `posts` | General content creation (fact claims, opinions, questions), engagement reactions, slow-mode tagging |
 | `notifications` | BullMQ-backed push + in-app alerts |
 | `b2b` | REST API for newsrooms/researchers |
 
@@ -158,3 +161,4 @@ REPUTATION_SERVICE_URL
 - Hardcode queue names, domain names, XP values, or reach tier thresholds
 - Bypass the Supabase JWT guard on authenticated routes
 - Delete or update `ReputationEvent` rows — append-only
+- Delete `Post` rows — context over censorship means tag + slow, never remove

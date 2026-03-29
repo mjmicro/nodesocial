@@ -14,8 +14,12 @@
 - Verify: `turbo dev` runs without errors
 
 ### Day 2 — Prisma Schema
-- Write full Prisma schema: `User`, `ReputationScore`, `WeeklyDelta`, `ReputationEvent`, `Report`, `Mission`, `MissionParticipant`, `Image`
-- Add PostGIS extension config for geospatial queries
+- Write full Prisma schema covering both content tracks:
+  - **Civic track:** `Report`, `Mission`, `MissionParticipant`
+  - **Social track:** `Post`, `PostReaction`
+  - **Shared:** `User`, `ReputationScore`, `WeeklyDelta`, `ReputationEvent`, `Image`
+- All enums typed: `ContentType`, `MissionStage`, `Scope`, `ReachTier`, `ReputationDomain`, `ReactionType`
+- PostGIS extension + `location geometry(Point, 4326)` on `User`, `Report`, `Mission`, `Post`
 - Run first migration against Supabase PostgreSQL
 - Verify: `prisma studio` shows all tables
 
@@ -88,17 +92,19 @@
 - BullMQ job: trigger image verification on upload
 - Verify: create report → upload photo to R2 → report appears in neighborhood
 
-### Day 12 — MissionsModule
+### Day 12 — MissionsModule + PostsModule
 - `MissionsModule`: create mission, get mission, update lifecycle stage
 - Scope logic: Street → Neighborhood → City (auto-escalation rules)
 - Mission participants: join, assign role, track contribution
-- Verify: create mission → update stage → scope escalation triggers correctly
+- `PostsModule`: create post (fact_claim/opinion/question/satire/personal_experience), list posts by neighborhood, apply slow-mode (`isSlowed`, `slowReason`) — never delete
+- `PostReaction` handling: credible/dispute/trust reactions, enforce one-per-user, enqueue `post-reactions` BullMQ job
+- Verify: create mission → stage transitions work; create post → appears in feed; react → `PostReaction` row created
 
 ### Day 13 — SearchModule
-- Typesense Cloud setup: indexes for `users`, `missions`, `neighborhoods`
-- `SearchModule`: full-text search across all three indexes
-- Sync Prisma writes to Typesense (BullMQ indexing jobs)
-- Verify: create mission → appears in Typesense search results within seconds
+- Typesense Cloud setup: indexes for `users`, `missions`, `posts`, `neighborhoods`
+- `SearchModule`: full-text search across all four indexes
+- Sync Prisma writes to Typesense via BullMQ `search-index` jobs (missions + posts)
+- Verify: create mission and post → both appear in Typesense search results within seconds
 
 ### Day 14 — NotificationsModule
 - `NotificationsModule`: Expo Push Notifications via `expo-server-sdk`
@@ -113,7 +119,9 @@
 
 ### Day 15 — Neighborhood Feed Screen
 - Real-time feed via Supabase Realtime (live updates, no polling)
-- Feed items: reports, missions, verifications, reputation events
+- Feed items: **both tracks** — posts (social) + reports/missions (civic) + verifications + reputation events
+- Feed items show content type badge (`fact_claim`, `opinion`, `question`, etc.)
+- Slow-mode posts display a context label instead of being hidden
 - Infinite scroll with React Query
 - Verify: two devices → action on one → instantly appears on other
 
@@ -139,20 +147,25 @@
 - Auto-transition to Active state at 3 confirmations
 - Verify: 3 users confirm → report status → Active in real-time
 
-### Day 19 — Swipe Interactions
-- Swipe right = Credible, swipe left = Dispute, long press = Trust
+### Day 19 — Swipe Interactions (Post Reactions)
+- Swipe gestures on `Post` cards: swipe right = Credible, swipe left = Dispute, long press = Trust
+- Creates/updates a `PostReaction` row (one per user per post, `@@unique([postId, userId])`)
 - Dispute modal: reason picker (inaccurate, misleading context, missing source, outdated)
 - Trust modal: domain selector (science, health, politics, etc.)
 - Animate swipe with `react-native-reanimated`
-- BullMQ job: enqueue reputation event on each interaction
-- Verify: swipe → reputation event queued → score updates within 10s
+- BullMQ job: enqueue reputation event on each reaction via `post-reactions` queue
+- Only `FACT_CLAIM` posts are eligible for Credible/Dispute rep effects
+- Verify: swipe → `PostReaction` created → reputation event queued → score updates within 10s
 
-### Day 20 — Content Classification
-- Post creation screen: user selects type (fact-claim, opinion, satire, question, personal experience)
-- AI suggestion (call `/classify` on reputation service)
+### Day 20 — Social Post Creation Screen
+- Post creation screen: user writes body text, selects `ContentType` (fact_claim, opinion, satire, question, personal_experience)
+- Optional domain tag (`ReputationDomain`) for fact claims
+- Optional location tag (GPS for local-feed placement)
+- Optional photo attach (gallery allowed for posts — camera-first rule applies to reports only)
+- AI classification suggestion (call `/classify` on reputation service); user can override
 - Display classification badge on feed items
-- Misclassification penalty wired to reputation engine
-- Verify: create fact-claim post → badge displays → wrong classification → -1.5 rep queued
+- Misclassification penalty (AI-confirmed): -1.5 rep via BullMQ
+- Verify: create fact_claim post → badge displays → wrong classification → -1.5 rep queued
 
 ### Day 21 — Profile Screen
 - Level + title display (Observer → Catalyst)
@@ -225,7 +238,9 @@
 ### Day 30 — Beta Launch
 - Invite system: generate 500 invite codes (one-time use, stored in PostgreSQL)
 - Seed data: 5 demo neighborhoods with existing missions and reports
-- Smoke test: full user journey on production (register → report → confirm → earn XP → level up)
+- Smoke test: full user journeys on production:
+  - Civic: register → report → confirm → mission created → earn XP → level up
+  - Social: post fact_claim → receive credible reaction → rep score updates
 - "You're caught up" endpoint (empty state handling)
 - EAS production build submitted to App Store + Play Store review
 - Flip Vercel deployment to production domain

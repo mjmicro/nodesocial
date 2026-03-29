@@ -3,9 +3,10 @@
 ## Neighborhood Model
 
 - Every user gets a **Neighborhood** based on their GPS location (~2km radius)
-- Neighborhood tab is the **default home screen**
+- Neighborhood tab is the **default home screen** — shows both civic (Reports/Missions) and social (Posts) content from within the radius
 - 50 active users in one neighborhood > 50,000 scattered globally
 - Neighborhoods are derived dynamically from coordinates — not fixed admin regions
+- `Post` records with a `location` set are surfaced in the local feed via the same `ST_DWithin` radius query as Reports; Posts without a location are excluded from the local feed
 
 ## Scope Escalation Table
 

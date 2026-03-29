@@ -26,24 +26,29 @@ ACTIVE     = clamp(base_50 + sum(weekly_deltas * recency_weight), floor=0, ceil=
 ## Signal Weights
 
 **Positive:**
-| Signal | Weight |
-|--------|--------|
-| successful_appeal | +4.0 |
-| verified_claim | +3.0 |
-| helpful_note | +2.0 |
-| accurate_dispute | +1.0 |
-| source_link | +0.5 |
-| credible_reaction | +0.15 |
+| Signal | Weight | Source |
+|--------|--------|--------|
+| successful_appeal | +4.0 | Appeal accepted |
+| verified_claim | +3.0 | `FACT_CLAIM` post confirmed accurate |
+| helpful_note | +2.0 | Contextual note accepted by community |
+| accurate_dispute | +1.0 | Dispute on a `Post` upheld |
+| source_link | +0.5 | Source added to a post or report |
+| credible_reaction | +0.15 | `PostReaction { reaction: CREDIBLE }` received on a `FACT_CLAIM` post |
 
 **Negative:**
-| Signal | Weight |
-|--------|--------|
-| coordinated_flag | -30.0 |
-| upheld_report | -8.0 |
-| debunked_claim | -5.0 |
-| frivolous_report | -2.0 |
-| misclassification | -1.5 |
-| upheld_dispute | -0.25 |
+| Signal | Weight | Source |
+|--------|--------|--------|
+| coordinated_flag | -30.0 | Attack detection trigger |
+| upheld_report | -8.0 | User abuse report upheld |
+| debunked_claim | -5.0 | `FACT_CLAIM` post marked inaccurate |
+| frivolous_report | -2.0 | Civic report filed in bad faith |
+| misclassification | -1.5 | `Post.contentType` corrected by AI |
+| upheld_dispute | -0.25 | `PostReaction { reaction: DISPUTE }` on your post upheld |
+
+**Content eligibility:**
+- Only `FACT_CLAIM` posts generate `credible_reaction` and `debunked_claim` signals
+- `OPINION` and `PERSONAL_EXPERIENCE` posts cannot be disputed on accuracy grounds (no rep effect from Dispute on these types)
+- All `Post` types can receive `TRUST` reactions (domain-specific, affects feed ranking but not the rep score directly)
 
 ## Reach Tiers (ACTIVE score only)
 
@@ -73,3 +78,7 @@ ACTIVE     = clamp(base_50 + sum(weekly_deltas * recency_weight), floor=0, ceil=
 - Never call the Python service synchronously from a request handler
 - Cache key pattern: `rep:{userId}:{domain}`
 - Cache TTL: 5 minutes for active users, 1 hour for inactive
+
+**Event sources (both content tracks):**
+- Civic: `ReportsModule` emits events on confirmation, fake-report detection, mission resolution
+- Social: `PostsModule` emits events on `PostReaction` creation (via `post-reactions` BullMQ queue)
