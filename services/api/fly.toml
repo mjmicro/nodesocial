@@ -2,7 +2,7 @@ app = "truthlayer-api"
 primary_region = "iad"
 
 [build]
-  dockerfile = "services/api/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [deploy]
   release_command = "node_modules/.bin/prisma migrate deploy --schema=packages/database/prisma/schema.prisma"

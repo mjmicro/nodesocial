@@ -23,12 +23,18 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=installer /app/node_modules ./node_modules
 COPY --from=pruner /app/out/full/ .
-RUN npm run build --workspace=services/api
+# turbo prune omits root-level config files from out/full — copy explicitly
+COPY --from=pruner /app/tsconfig.json ./tsconfig.json
+# Build local packages in dependency order, then the API
+RUN cd packages/shared && npx tsc -p tsconfig.json
+RUN cd packages/database && npx tsc -p tsconfig.json
+RUN cd services/api && npx nest build
 
 # Stage 4 — Minimal production runner
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/services/api/dist ./services/api/dist
