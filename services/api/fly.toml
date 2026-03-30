@@ -1,0 +1,30 @@
+app = "truthlayer-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "services/api/Dockerfile"
+
+[deploy]
+  release_command = "node_modules/.bin/prisma migrate deploy --schema=packages/database/prisma/schema.prisma"
+
+[env]
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

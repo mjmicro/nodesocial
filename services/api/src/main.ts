@@ -9,11 +9,13 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter({ logger: true }),
   )
 
+  const corsOrigin = process.env['CORS_ORIGIN']
   app.enableCors({
     origin: [
       'http://localhost:8081',  // Expo web dev
       'http://localhost:19006', // Expo web alt port
       /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // LAN devices
+      ...(corsOrigin ? [corsOrigin] : []),
     ],
     credentials: true,
   })

@@ -16,6 +16,7 @@ const envSchema = z.object({
   TYPESENSE_API_KEY:        z.string().min(1),
   JWT_SECRET:               z.string().min(32),
   REPUTATION_SERVICE_URL:   z.string().url(),
+  CORS_ORIGIN:              z.string().url().optional(),
   PORT:                     z.coerce.number().default(3001),
 })
 
