@@ -2,5 +2,6 @@
   "buildCommand": "turbo run build --filter=@truthlayer/app",
   "outputDirectory": "apps/app/dist",
   "installCommand": "npm ci",
-  "framework": null
+  "framework": null,
+  "rewrites": [{ "source": "/((?!_next|static|favicon.ico).*)", "destination": "/index.html" }]
 }
