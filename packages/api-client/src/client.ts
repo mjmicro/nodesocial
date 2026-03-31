@@ -1,9 +1,10 @@
 import { Platform } from 'react-native'
 
 export const API_URL =
-  Platform.OS === 'web'
+  process.env.EXPO_PUBLIC_API_URL ??
+  (Platform.OS === 'web'
     ? `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:3001`
-    : (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001')
+    : 'http://localhost:3001')
 
 export class ApiError extends Error {
   constructor(
